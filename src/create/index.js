@@ -5,6 +5,7 @@ const { prompt } = require("inquirer");
 const fs = require("fs-extra");
 const { config, log } = require("../utils/index");
 const Creator = require('./lib/Creator');
+const getPromptModules = require('./lib/getPromptModules');
 
 async function factory(argv) {
   const { currentDirectory, projectName } = argv;
@@ -18,7 +19,10 @@ async function factory(argv) {
   const projectDir = path.join(currentDirectory, projectName);
   log.info("create命令", "创建的项目目录为%s", projectDir);
 
-  const creator = new Creator(projectName,projectDir);
+  const promptModules =  getPromptModules();
+  console.log('promptModules',promptModules);//函数的数组
+
+  const creator = new Creator(projectName,projectDir, promptModules);
   await creator.create();
 
   // 启动服务
