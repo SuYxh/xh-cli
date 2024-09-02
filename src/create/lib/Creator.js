@@ -171,12 +171,18 @@ class Creator {
     }
 
     // 准备进行下载
+    // 动态导入 ora
+    const ora = await import('ora')
+
+    // 准备进行下载
+    const spinner = ora.default(`🚀 从仓库下载 ${repository} 下载到 ${this.projectDir}`).start()
     try {
-      log.info(`🚀 从仓库下载 ${repository} 下载到 ${this.projectDir}`)
       await clone(repository, this.projectDir, { clone: true })
+      spinner.succeed(`🎉 ${repo} 下载成功`)
     } catch (error) {
-      const msg = `${red('X')} ${repo} 下载失败，${this.projectDir} 下已经存在文件，请删除后在重试`
-      log.error('error', msg)
+      spinner.fail(
+        `${red('X')} ${repo} 下载失败，${this.projectDir} 下已经存在文件，请删除后在重试`
+      )
       process.exit(1)
     }
   }
