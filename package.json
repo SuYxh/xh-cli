@@ -1,6 +1,6 @@
 {
   "name": "@yangxinhao/cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A command-line interface tool for simplifying development tasks.",
   "keywords": [
     "cli",
@@ -30,6 +30,7 @@
     "inquirer": "^8.1.2",
     "isbinaryfile": "^4.0.10",
     "npmlog": "^5.0.1",
+    "open": "^10.1.0",
     "ora": "^6.0.0",
     "rimraf": "^6.0.1",
     "userhome": "^1.0.0",

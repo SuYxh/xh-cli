@@ -10,7 +10,7 @@ exports.RC_NAME = '.xhrc'
 //模板存放名称
 exports.TEMPLATES = '.xhrc_templates'
 
-exports.GIT_TYPE_LIST = ['github', 'gitee']
+exports.GIT_TYPE_LIST = ['github']
 exports.ORG_NAME_LIST = ['ironorg']
 exports.GIT_TYPE_KEY = 'GIT_TYPE'
 exports.ORG_NAME_KEY = 'ORG_NAME'

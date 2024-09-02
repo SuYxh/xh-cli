@@ -3,6 +3,7 @@
 const yargs = require('yargs/yargs')
 const configCmd = require('./config/command')
 const createCmd = require('./create/command')
+const openCmd = require('./open/command')
 
 async function main() {
   const cli = yargs()
@@ -13,6 +14,7 @@ async function main() {
     .recommendCommands()
     .command(configCmd)
     .command(createCmd)
+    .command(openCmd)
     .parse(process.argv.slice(2))
 }
 
