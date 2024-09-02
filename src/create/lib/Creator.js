@@ -4,7 +4,8 @@ const glob = promisify(require('glob'))
 const fs = require('fs-extra')
 const { red } = require('chalk')
 const execa = require('execa')
-const clone = promisify(require('../../utils/clone'))
+// const clone = promisify(require('../../utils/clone'))
+const clone = require('../../utils/clone')
 const {
   log,
   config,
@@ -153,6 +154,10 @@ class Creator {
       request.get(`/repos/${ORG_NAME}/${repo}/tags`)
     )
 
+    if (!tags?.length) {
+      log.info('当前模板没有 tag')
+    }
+
     let _tag = null
     if (tags?.length) {
       const { tag } = await prompt({
@@ -180,9 +185,10 @@ class Creator {
       await clone(repository, this.projectDir, { clone: true })
       spinner.succeed(`🎉 ${repo} 下载成功`)
     } catch (error) {
-      spinner.fail(
-        `${red('X')} ${repo} 下载失败，${this.projectDir} 下已经存在文件，请删除后在重试`
-      )
+      console.log('error', error)
+      // spinner.fail(
+      //   `${red('X')} ${repo} 下载失败，${this.projectDir} 下已经存在文件，请删除后在重试`
+      // )
       process.exit(1)
     }
   }
