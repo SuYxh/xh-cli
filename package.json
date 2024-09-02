@@ -1,7 +1,8 @@
 {
   "name": "@yangxinhao/cli",
   "version": "1.0.0",
-  "description": "",
+  "description": "cli",
+  "author": "baiyu",
   "main": "/src/index.js",
   "bin": {
     "xh": "/src/index.js"
@@ -28,10 +29,8 @@
     "yargs": "^17.7.2"
   },
   "publishConfig": {
-    "access": "public",
-    "registry": "http://registry.npmjs.org"
+    "access": "public"
   },
   "keywords": [],
-  "author": "",
   "license": "ISC"
 }
