@@ -185,10 +185,7 @@ class Creator {
       await clone(repository, this.projectDir, { clone: true })
       spinner.succeed(`🎉 ${repo} 下载成功`)
     } catch (error) {
-      console.log('error', error)
-      // spinner.fail(
-      //   `${red('X')} ${repo} 下载失败，${this.projectDir} 下已经存在文件，请删除后在重试`
-      // )
+      spinner.fail(`${repo} 下载失败：${error.message}`)
       process.exit(1)
     }
   }
