@@ -11,5 +11,6 @@ if (fs.existsSync(configPath)) {
 }
 
 config.configPath = configPath
+config.autoStart = 0
 
 module.exports = config

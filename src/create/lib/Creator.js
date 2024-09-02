@@ -3,18 +3,17 @@ const { promisify } = require('util')
 const glob = promisify(require('glob'))
 const fs = require('fs-extra')
 const { red } = require('chalk')
-const userhome = require('userhome')
 const execa = require('execa')
-const clone = promisify(require('clone-git-repo'))
+const clone = promisify(require('../../utils/clone'))
 const {
   log,
   config,
   withLoading,
   request,
   loadModule,
-  writeFileTree
+  writeFileTree,
+  gitInfo
 } = require('../../utils/index')
-const { TEMPLATES } = require('../../settings/index')
 const PromptModuleAPI = require('./PromptModuleAPI')
 const path = require('path')
 const GeneratorAPI = require('./GeneratorAPI')
@@ -69,60 +68,68 @@ class Creator {
     //   appTitle: 'AppTitle'
     // }
     const projectOptions = (this.projectOptions = await this.promptAndResolve())
-    // console.log('projectOptions', projectOptions)
 
     // 准备项目目录
     await this.prepareProjectDir()
 
-    // 下载模板，给 templateDir 赋值
+    // 下载模板
     await this.downloadTemplate()
 
-    //把项目拷贝到模板中
-    await fs.copy(this.templateDir, this.projectDir)
+    // 更新一下模板项目中的 name and author
+    await this.updateNameAndAuthor()
 
     // 修改当前项目中package.json的开发依赖，添加插件的依赖
-    const pkgPath = path.join(this.projectDir, 'package.json')
-    const pkg = (this.pkg = await fs.readJSON(pkgPath))
     const pluginDeps = Reflect.ownKeys(projectOptions.plugins) // ['cli-plugin-router']
-    pluginDeps.forEach((dep) => (pkg.devDependencies[dep] = 'latest'))
-    await fs.writeJSON(pkgPath, pkg, { spaces: 2 })
 
-    //初始化git仓库
-    // await execa("git", ["init"], { cwd: this.projectDir, stdio: "inherit" });
-    // log.info("vite100", "在%s安装依赖", this.projectDir);
-    // await execa("npm", ["install"], { cwd: this.projectDir, stdio: "inherit" });
+    // 没有插件的时候直接走这里
+    if (!pluginDeps?.length) {
+      // TODO: 当前没有任何插件，所以会走到这里
+      log.info('🎉 恭喜，项目创建成功！ ')
+    } else {
+      // 有插件继续往下执行
+      const pkgPath = path.join(this.projectDir, 'package.json')
+      const pkg = (this.pkg = await fs.readJSON(pkgPath))
+      pluginDeps.forEach((dep) => (pkg.devDependencies[dep] = 'latest'))
+      await fs.writeJSON(pkgPath, pkg, { spaces: 2 })
 
-    //初始化files对象
-    await this.initFiles()
-    // console.log("this.files", this.files);
-    //找到插件并执行插件
-    let innerPlugins = projectOptions.plugins //内置插件对象
-    let customPlugins = Object.keys(pkg.devDependencies).filter((npmName) =>
-      npmName.startsWith('cli-')
-    )
-    let pluginObj = {}
-    customPlugins.forEach((pluginName) => {
-      pluginObj[pluginName] = {}
-    })
-    // 在这里可以增加一次去重
-    const resolvedPlugins = await this.resolvePlugins({
-      ...innerPlugins,
-      ...pluginObj
-    })
-    // console.log('resolvedPlugins', resolvedPlugins)
-    // 执行应用插件，执行插件的时候只是添加了中间件的函数
-    await this.applyPlugins(resolvedPlugins)
-    // 插件执行的时候 并不会真正的修改this.files,而是会修改this.imports  this.fileMiddlewares
-    // 开始调用中间件真正处理文件 this.files
-    await this.renderFiles()
+      //初始化git仓库
+      // await execa("git", ["init"], { cwd: this.projectDir, stdio: "inherit" });
+      // log.info("create", "在%s安装依赖", this.projectDir);
+      await execa('npm', ['install'], { cwd: this.projectDir, stdio: 'inherit' })
 
-    //此插件只在项目生成阶段有用，后面开发运行是没有用的，所以删除掉
-    pluginDeps.forEach((dep) => delete pkg.devDependencies[dep])
-    this.files['package.json'] = JSON.stringify(pkg, null, 2)
-    // 把files写入项目目录
-    await writeFileTree(this.projectDir, this.files)
-    // 因为插件可能会扩展依赖包 react-router-dom
-    // await execa("npm", ["install"], { cwd: this.projectDir, stdio: "inherit" });
+      //初始化files对象
+      await this.initFiles()
+      //找到插件并执行插件
+      let innerPlugins = projectOptions.plugins //内置插件对象
+      let customPlugins = Object.keys(pkg.devDependencies).filter((npmName) =>
+        npmName.startsWith('cli-')
+      )
+      let pluginObj = {}
+      customPlugins.forEach((pluginName) => {
+        pluginObj[pluginName] = {}
+      })
+      // 在这里可以增加一次去重
+      const resolvedPlugins = await this.resolvePlugins({
+        ...innerPlugins,
+        ...pluginObj
+      })
+      // 执行应用插件，执行插件的时候只是添加了中间件的函数
+      await this.applyPlugins(resolvedPlugins)
+      // 插件执行的时候 并不会真正的修改this.files,而是会修改this.imports  this.fileMiddlewares
+      // 开始调用中间件真正处理文件 this.files
+      await this.renderFiles()
+
+      //此插件只在项目生成阶段有用，后面开发运行是没有用的，所以删除掉
+      pluginDeps.forEach((dep) => delete pkg.devDependencies[dep])
+      this.files['package.json'] = JSON.stringify(pkg, null, 2)
+      // 把files写入项目目录
+      await writeFileTree(this.projectDir, this.files)
+
+      if (config.autoStart) {
+        // 因为插件可能会扩展依赖包
+        await execa('npm', ['install'], { cwd: this.projectDir, stdio: 'inherit' })
+      }
+    }
   }
 
   async downloadTemplate() {
@@ -163,22 +170,14 @@ class Creator {
       repository += `#${_tag}`
     }
 
-    // 下载的目录
-    const downloadDirectory = userhome(TEMPLATES)
-    const _downloadDirectory = _tag
-      ? `${downloadDirectory}/${repo}/${_tag}`
-      : `${downloadDirectory}/${repo}`
-
-    const templateDir = (this.templateDir = _downloadDirectory)
-
-    log.info('Creator', '准备下载模板到%s', templateDir)
-
+    // 准备进行下载
     try {
-      // 如果目录存在了，就不在 clone 了
-      await fs.access(templateDir)
+      log.info(`🚀 从仓库下载 ${repository} 下载到 ${this.projectDir}`)
+      await clone(repository, this.projectDir, { clone: true })
     } catch (error) {
-      log.info('Creator', '从仓库下载%s', repository)
-      await clone(repository, templateDir, { clone: true })
+      const msg = `${red('X')} ${repo} 下载失败，${this.projectDir} 下已经存在文件，请删除后在重试`
+      log.error('error', msg)
+      process.exit(1)
     }
   }
 
@@ -202,7 +201,7 @@ class Creator {
     } catch (error) {
       await fs.mkdirp(projectDir)
     }
-    log.info('create命令', '%s目录已经准备就绪', projectDir)
+    log.info('📂 项目目录为: ', projectDir)
   }
 
   async renderFiles() {
@@ -275,10 +274,31 @@ class Creator {
 
   async promptAndResolve() {
     let prompts = [this.featurePrompt, ...this.injectPrompts]
-    let answers = await prompt(prompts)
-    let projectOptions = { plugins: {} }
+    let answers = null
+
+    if (prompts?.length === 1 && !prompts?.[0]?.choices?.length) {
+      // 没有选项的时候直接跳过
+      answers = {}
+    } else {
+      answers = await prompt(prompts)
+    }
+
+    const projectOptions = { plugins: {} }
     this.promptCompleteCbs.forEach((cb) => cb(answers, projectOptions))
     return projectOptions
+  }
+
+  /**
+   * @description: 更新 package.json 中的name 和 author
+   * @return {*}
+   */
+  async updateNameAndAuthor() {
+    const email = await gitInfo.getUserEmail()
+    const pkgPath = path.join(this.projectDir, 'package.json')
+    const pkg = await fs.readJSON(pkgPath)
+    pkg.name = this.projectName
+    pkg.author = email
+    await fs.writeJSON(pkgPath, pkg, { spaces: 2 })
   }
 }
 
